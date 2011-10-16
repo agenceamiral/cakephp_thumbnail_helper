@@ -17,13 +17,17 @@ Usage
 
 
 <?php 
+
 	// Add the Thumbnail helper to the helpers array at the top of your controller
 	var $helpers = array('Thumbnail');
+
 ?>
 
 <?php
+
 	// This will return the path of the resized image
 	$thumbnail->get($original_image_path, array('size'=>'200', 'transform'=>'scale'));
+
 ?>
 
 Options (general):
