@@ -1,4 +1,4 @@
-Thumbnail Helper for CakePHP
+Thumbnail Helper for CakePHP 2.*
 =====
 http://agenceamiral.com/labs/cakephp_thumbnail
 
@@ -9,7 +9,7 @@ Thumbnails are generated at the display and are cached for better performance.
 Installation
 ===================================
 
-Put the thumbnail.php file in the app/views/helpers directory
+Put the ThumbnailHelper.php file in the app/View/Helper directory
 
 
 Usage
@@ -43,7 +43,11 @@ Options (crop):
 
 Options (scale):
 
-* size : Maximum width or height
+* width : Width of the thumbnail
+* height : Height of the thumbnail
+* size : Alias of width and height for square thumbnails
+* maxWidth : Maximum width (use with maxHeight)
+* maxHeight : Maximum height (use with maxWidth)
 
 Options (frame):
 

@@ -14,7 +14,7 @@
 *
 * @author Gabriel Boucher <gabriel@agenceamiral.com>
 * @author Eric Forgues <eric@agenceamiral.com>
-* @version v1.0
+* @version v2.0
 *
 */
 class ThumbnailHelper extends Helper {
@@ -27,8 +27,10 @@ class ThumbnailHelper extends Helper {
 			$complete_path = substr($complete_path, 1);
 		}
 		//******* options and default values *******
-		$newWidth = null; // used for _frame if null will be set to the size
-		$newHeight = null; // used for _frame if null will be set to the size
+		$newWidth = null;
+		$newHeight = null;
+		$maxWidth = null;
+		$maxHeight = null;
 		$size = null;
 		$transform = 'scale';
 		$bgcolor = "000000";
@@ -46,6 +48,12 @@ class ThumbnailHelper extends Helper {
 						break;
 					case 'height':
 						$newHeight = $value;
+						break;
+					case 'maxWidth':
+						$maxWidth = $value;
+						break;
+					case 'maxHeight':
+						$maxHeight = $value;
 						break;
 					case 'size':
 						$size = $value;
@@ -85,8 +93,17 @@ class ThumbnailHelper extends Helper {
 			$filename = null;
 			for($i=0;$i<(count($split)-1);$i++) {
 				$filename .= $split[$i];
-			}			
-			$filenameopt = ($transform == 'frame' || ($transform == 'crop' && !$size))? $newWidth . 'x' . $newHeight.'-'.$bgcolor:$transform.'-'.$size;	
+			}
+			$filenameopt = '';
+			if($transform == 'frame' || ($transform == 'crop' && !$size)) {
+				$filenameopt = $newWidth . 'x' . $newHeight.'-'.$bgcolor;
+			}
+			elseif($maxHeight != null && $maxWidth != null) {
+				$filenameopt = $transform.'_max-'.$maxWidth.'x'.$maxHeight;
+			}
+			else {
+				$filenameopt = $transform.'-'.$size;
+			}		
 			$filename = $filename . '-' . $filenameopt. '.' . $split[(count($split)-1)];
 			$dest = $cache . basename($filename);
 		}
@@ -97,10 +114,29 @@ class ThumbnailHelper extends Helper {
 		}
 		if(!($cache && file_exists($dest))) {
 			if ($transform == 'frame') {
-				
 				$temp_images = $this->_frame($complete_path, $ext, $newWidth, $newHeight, $oldWidth, $oldHeight, $bgcolor);
 			}
 			else if ($transform == 'scale') {
+				
+				
+				if (($newHeight != null || $newWidth != null)) {
+					$size = array();
+				}
+				
+				if ($newHeight != null) {
+					$size['height'] = $newHeight;
+				}
+				
+				if ($newWidth != null) {
+					$size['width'] = $newWidth;
+				}
+				
+				if ($maxWidth != null && $maxHeight != null) {
+					$size = array();
+					$size['maxWidth'] = $maxWidth;
+					$size['maxHeight'] = $maxHeight;
+				}
+				
 				$temp_images = $this->_scale($complete_path, $ext, $size);
 			}
 			else if ($transform == 'crop') {
@@ -115,6 +151,7 @@ class ThumbnailHelper extends Helper {
 					imagegif($temp_images['new'], $dest, $quality);
 					break;
 				case 'png' :
+					$quality = ($quality > 1)? floor((($quality-1) / 10)):0;
 					imagepng($temp_images['new'], $dest, $quality);
 					break;
 				case 'jpg' :
@@ -256,40 +293,81 @@ class ThumbnailHelper extends Helper {
 		return array('new'=>$cropped, 'old1'=>$resampled, 'old2'=>$img_src);
   }
 
-  function _scale($img, $ext, $size)    {
+	function _scale($img, $ext, $size)    {
+		switch($ext) {
+		    case "jpeg":
+		    case "jpg":
+		    $img_src = ImageCreateFromjpeg ($img);
+		    break;
+		    case "gif":
+		    $img_src = imagecreatefromgif ($img);
+		    break;
+		    case "png":
+		    $img_src = imagecreatefrompng ($img);
+		    break;
+		}
 
-      switch($ext) {
-          case "jpeg":
-          case "jpg":
-          $img_src = ImageCreateFromjpeg ($img);
-          break;
-          case "gif":
-          $img_src = imagecreatefromgif ($img);
-          break;
-          case "png":
-          $img_src = imagecreatefrompng ($img);
-          break;
-      }
+		$true_width = imagesx($img_src);
+		$true_height = imagesy($img_src);
 
-      $true_width = imagesx($img_src);
-      $true_height = imagesy($img_src);
+		if (is_array($size)) {
 
-      if ($true_width>=$true_height)
-      {
-          $width=$size;
-          $height = ($width/$true_width)*$true_height;
-      }
-      else
-      {
-          $height=$size;
-          $width = ($height/$true_height)*$true_width;
-      }
-      $width = round($width);
-      $height = round($height);
-      $img_des = ImageCreateTrueColor($width,$height);
-      imagecopyresampled ($img_des, $img_src, 0, 0, 0, 0, $width, $height, $true_width, $true_height);
+			if (isset($size['width']) && isset($size['height'])) {
+				
+				$width=$size['width'];
+				$height=$size['height'];
+				
+			} elseif (isset($size['height'])) {
+				
+				$height=$size['height'];
+				$width = ($height/$true_height)*$true_width;
+				
+			} elseif (isset($size['width'])) {
+				
+				$width=$size['width'];
+				$height = ($width/$true_width)*$true_height;
+				
+			} elseif(isset($size['maxWidth'])) {
+				if($true_width >= $true_height) {
+					$width = $size['maxWidth'];
+					$height = $true_height/$true_width*$size['maxWidth'];
+					if($height > $size['maxHeight']) {
+						$height = $size['maxHeight'];
+						$width = $true_width/$true_height*$size['maxHeight'];
+					}
+				}
+				else {
+					$height = $size['maxHeight'];
+					$width = $true_width/$true_height*$size['maxHeight'];
+					if($width > $size['maxWidth']) {
+						$width = $size['maxWidth'];
+						$height = $true_height/$true_width*$size['maxWidth'];
+					}
+				}
+			}
 			
-			return array('new'=>$img_des, 'old'=>$img_src);
+		}
+		else {
+			if ($true_width>=$true_height)
+			{
+			    $width=$size;
+			    $height = ($width/$true_width)*$true_height;
+			}
+			else
+			{
+			    $height=$size;
+			    $width = ($height/$true_height)*$true_width;
+			}
+		}
+
+
+		
+		$width = round($width);
+		$height = round($height);
+		$img_des = ImageCreateTrueColor($width,$height);
+		imagecopyresampled ($img_des, $img_src, 0, 0, 0, 0, $width, $height, $true_width, $true_height);
+
+		return array('new'=>$img_des, 'old'=>$img_src);
 			
   }
   
