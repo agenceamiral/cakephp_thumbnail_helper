@@ -26,7 +26,7 @@ Usage
 <?php
 
 	// This will return the path of the resized image
-	$thumbnail->get($original_image_path, array('size'=>'200', 'transform'=>'scale'));
+	$this->Thumbnail->get($original_image_path, array('size'=>'200', 'transform'=>'scale'));
 
 ?>
 
