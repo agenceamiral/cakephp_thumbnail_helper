@@ -14,7 +14,7 @@
 *
 * @author Gabriel Boucher <gabriel@agenceamiral.com>
 * @author Eric Forgues <eric@agenceamiral.com>
-* @version v2.0
+* @version v2.0.3
 *
 */
 class ThumbnailHelper extends Helper {
@@ -23,8 +23,11 @@ class ThumbnailHelper extends Helper {
 		if (!$complete_path) {
 			return null;
 		}
+		if (substr($complete_path, 0, 4) == 'http') {
+			return $complete_path;
+		}
 		if(substr($complete_path, 0, 1) == '/') {
-			$complete_path = substr($complete_path, 1);
+			$complete_path = urldecode(substr($complete_path, 1));
 		}
 		//******* options and default values *******
 		$newWidth = null;
@@ -37,8 +40,6 @@ class ThumbnailHelper extends Helper {
 		$cache = WWW_ROOT.dirname($complete_path).'/thumbnails/';
 		//*************************
 		$quality = 100;
-		list($oldWidth, $oldHeight, $type) = getimagesize($complete_path); 
-		$ext = $this->_image_type_to_extension($type);
 		if (!empty($options)) {
 			foreach($options as $option=>$value) {
 				
@@ -65,8 +66,14 @@ class ThumbnailHelper extends Helper {
 						$bgcolor = $value;
 						break;
 					case 'cache':
-						$cache = $value;
+						if(substr($value, -1) == '/'){
+							$cache = WWW_ROOT.$value;
+						}
+						else {
+							$cache = WWW_ROOT.$value.'/';
+						}
 						break;
+
 				}				
 			}
 		}	
@@ -113,6 +120,9 @@ class ThumbnailHelper extends Helper {
 			unlink($dest);
 		}
 		if(!($cache && file_exists($dest))) {
+			list($oldWidth, $oldHeight, $type) = getimagesize(urldecode($complete_path)); 
+			$ext = $this->_image_type_to_extension($type);
+			
 			if ($transform == 'frame') {
 				$temp_images = $this->_frame($complete_path, $ext, $newWidth, $newHeight, $oldWidth, $oldHeight, $bgcolor);
 			}
@@ -170,7 +180,7 @@ class ThumbnailHelper extends Helper {
 			}
 		}
 		
-		return substr($dest, strlen(WWW_ROOT));
+		return '/'.substr($dest, strlen(WWW_ROOT));
 	}
 
 	function _frame($img, $ext, $newWidth, $newHeight, $oldWidth, $oldHeight, $bgcolor) {
@@ -209,6 +219,8 @@ class ThumbnailHelper extends Helper {
 					case 'png' :
 						$oldImage = imagecreatefrompng($img);
 						$newImage = imagecreatetruecolor($newWidth, $newHeight);
+			            imagealphablending($newImage,FALSE);
+						imagesavealpha($newImage,TRUE);
 						break;
 					default :
 						return false;
@@ -279,6 +291,12 @@ class ThumbnailHelper extends Helper {
 		
 		$resampled = imagecreatetruecolor(round($witdh_ratio), round($height_ratio));
 		$cropped = imagecreatetruecolor($new_width, $new_height);
+		if ($ext == "png") {
+            imagealphablending($cropped,FALSE);
+			imagesavealpha($cropped,TRUE);
+            imagealphablending($resampled,FALSE);
+			imagesavealpha($resampled,TRUE);
+		}
 		
 		$witdh_ratio = round($witdh_ratio);
 		$height_ratio = round($height_ratio);
@@ -360,11 +378,14 @@ class ThumbnailHelper extends Helper {
 			}
 		}
 
-
 		
 		$width = round($width);
 		$height = round($height);
 		$img_des = ImageCreateTrueColor($width,$height);
+		if ($ext == "png") {
+            imagealphablending($img_des,FALSE);
+			imagesavealpha($img_des,TRUE);
+		}
 		imagecopyresampled ($img_des, $img_src, 0, 0, 0, 0, $width, $height, $true_width, $true_height);
 
 		return array('new'=>$img_des, 'old'=>$img_src);
@@ -374,26 +395,97 @@ class ThumbnailHelper extends Helper {
 
 	function _image_type_to_extension($imagetype) {
 		if(empty($imagetype)) return false;
-			switch($imagetype) {
-				case IMAGETYPE_GIF    : return 'gif';
-				case IMAGETYPE_JPEG    : return 'jpg';
-				case IMAGETYPE_PNG    : return 'png';
-				case IMAGETYPE_SWF    : return 'swf';
-				case IMAGETYPE_PSD    : return 'psd';
-				case IMAGETYPE_BMP    : return 'bmp';
-				case IMAGETYPE_TIFF_II : return 'tiff';
-				case IMAGETYPE_TIFF_MM : return 'tiff';
-				case IMAGETYPE_JPC    : return 'jpc';
-				case IMAGETYPE_JP2    : return 'jp2';
-				case IMAGETYPE_JPX    : return 'jpf';
-				case IMAGETYPE_JB2    : return 'jb2';
-				case IMAGETYPE_SWC    : return 'swc';
-				case IMAGETYPE_IFF    : return 'aiff';
-				case IMAGETYPE_WBMP    : return 'wbmp';
-				case IMAGETYPE_XBM    : return 'xbm';
-				default                : return false;
+		switch($imagetype) {
+			case IMAGETYPE_GIF    : return 'gif';
+			case IMAGETYPE_JPEG    : return 'jpg';
+			case IMAGETYPE_PNG    : return 'png';
+			case IMAGETYPE_SWF    : return 'swf';
+			case IMAGETYPE_PSD    : return 'psd';
+			case IMAGETYPE_BMP    : return 'bmp';
+			case IMAGETYPE_TIFF_II : return 'tiff';
+			case IMAGETYPE_TIFF_MM : return 'tiff';
+			case IMAGETYPE_JPC    : return 'jpc';
+			case IMAGETYPE_JP2    : return 'jp2';
+			case IMAGETYPE_JPX    : return 'jpf';
+			case IMAGETYPE_JB2    : return 'jb2';
+			case IMAGETYPE_SWC    : return 'swc';
+			case IMAGETYPE_IFF    : return 'aiff';
+			case IMAGETYPE_WBMP    : return 'wbmp';
+			case IMAGETYPE_XBM    : return 'xbm';
+			default                : return false;
+		}
+	}
+
+	function grey($complete_path) {
+		if(substr($complete_path, 0, 1) == '/') {
+			$complete_path = substr($complete_path, 1);
+		}
+
+		$quality = 100;
+		$cache = WWW_ROOT.dirname($complete_path).'/grey/';
+
+		$split = explode('.', $complete_path);
+		$filename = null;
+		for($i=0;$i<(count($split)-1);$i++) {
+			$filename .= $split[$i];
+		}
+		$filename = $filename . '-grey.' . $split[(count($split)-1)];
+		$dest = $cache . basename($filename);
+
+		if (!is_writeable($cache)) {
+			if (!mkdir($cache)) {
+				debug("You must set either a cache folder or temporal folder for image processing. And the folder has to be writable.");
+				if (strlen($cache))	{
+					debug("Cache Folder \"".$cache."\" has permissions ".substr(sprintf('%o', fileperms($cache)), -4));
+					debug("Please run \"chmod 777 $cache\"");
+				}
+				exit();
 			}
 		}
 
+		if(!($cache && file_exists($dest))) {
+			list($oldWidth, $oldHeight, $type) = getimagesize($complete_path); 
+			$ext = $this->_image_type_to_extension($type);
+
+			switch($ext){
+	          	case "jpeg":
+	          	case "jpg":
+	            	$img_src = ImageCreateFromjpeg($complete_path);
+	           		break;
+	           	case "gif":
+	            	$img_src = imagecreatefromgif($complete_path);
+	           		break;
+	            case "png":
+	            	$img_src = imagecreatefrompng($complete_path);
+		            imagealphablending($img_src,FALSE);
+					imagesavealpha($img_src,TRUE);
+	           		break;
+	      	}
+
+	      	imagefilter($img_src, IMG_FILTER_GRAYSCALE);
+
+	      	switch($ext) {
+				case 'gif' :
+					imagegif($img_src, $dest, $quality);
+					break;
+				case 'png' :
+					$quality = ($quality > 1)? floor((($quality-1) / 10)):0;
+					imagepng($img_src, $dest, $quality);
+					break;
+				case 'jpg' :
+				case 'jpeg' :
+					imagejpeg($img_src, $dest, $quality);
+					break;
+				default :
+					return false;
+					break;
+			}
+
+			@imagedestroy($img_src);
+		}
+		
+		return '/'.substr($dest, strlen(WWW_ROOT));
 	}
+
+}
 ?>
